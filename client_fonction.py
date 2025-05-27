@@ -79,7 +79,7 @@ def save_client(nom, prenom, email="", telephone=""):
         "Nom": [nom],
         "Prénom": [prenom],
         "Email": [email],
-        "Téléphone": [telephone]
+        "Téléphone": [str(telephone)]
     })
     
     # Ajouter la ligne avec pd.concat
