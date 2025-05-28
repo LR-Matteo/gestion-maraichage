@@ -195,7 +195,6 @@ elif selected_partie == "Ventes":
         produit_options = produits["Nom"].tolist()
         temp_selected_produits = st.multiselect("Produits", produit_options, default=st.session_state.selected_produits, key="vente_produits")
         confirm_button = st.form_submit_button("Confirmer la sélection des produits")
-        reset_button = st.form_submit_button("Réinitialiser le formulaire")
         if confirm_button and temp_selected_produits:
             st.session_state.show_quantites = True
             st.session_state.selected_produits = temp_selected_produits
@@ -235,19 +234,6 @@ elif selected_partie == "Ventes":
                         st.error("Erreur lors de l'ajout de la vente")
                 except Exception as e:
                     st.error(f"Erreur lors de l'enregistrement de la vente : {e}")
-        if reset_button:
-            st.session_state.show_quantites = False
-            st.session_state.selected_produits = []
-            st.session_state.vente_form_reset = True
-            # Réinitialiser les widgets
-            if "vente_client" in st.session_state:
-                st.session_state.vente_client = client_options[0] if client_options else ""
-            if "vente_produits" in st.session_state:
-                st.session_state.vente_produits = []
-            for produit in produit_options:
-                if f"quantite_{produit}" in st.session_state:
-                    st.session_state[f"quantite_{produit}"] = 0.0
-            st.rerun()
 
     st.header("Supprimer une vente")
     with st.form(key="delete_vente_form"):
@@ -288,8 +274,8 @@ elif selected_partie == "Dépenses":
                 for depense_id in selected_depenses:
                     st.subheader(f"Détails de la dépense {depense_id}")
                     details = get_depense_details(depense_id)
-                    if details is not None:
-                        st.dataframe(pd.DataFrame([details]))
+                    if not details.empty:
+                        st.dataframe(details)
                     else:
                         st.write("Aucun détail disponible.")
                 csv = load_depenses_cache(_invalidate=True).to_csv(index=False)
@@ -303,7 +289,7 @@ elif selected_partie == "Dépenses":
                 st.write("Aucune donnée dépense à afficher.")
         except Exception as e:
             st.error(f"Erreur lors de l'affichage des dépenses : {e}")
-
+            
     st.header("Ajouter une dépense")
     if "show_prix_depenses" not in st.session_state:
         st.session_state.show_prix_depenses = False
@@ -316,7 +302,6 @@ elif selected_partie == "Dépenses":
         date = st.date_input("Date de la dépense")
         noms_depenses = st.text_input("Noms des dépenses (séparés par des virgules)", placeholder="Engrais, Arrosage, Semences", key="depense_noms")
         confirm_button = st.form_submit_button("Confirmer la sélection des dépenses")
-        reset_button = st.form_submit_button("Réinitialiser le formulaire")
         if confirm_button and noms_depenses:
             temp_selected_depenses = [nom.strip() for nom in noms_depenses.split(",") if nom.strip()]
             if temp_selected_depenses:
@@ -357,17 +342,6 @@ elif selected_partie == "Dépenses":
                         st.rerun()
                 except Exception as e:
                     st.error(f"Erreur lors de l'enregistrement des dépenses : {e}")
-        if reset_button:
-            st.session_state.show_prix_depenses = False
-            st.session_state.selected_depenses = []
-            st.session_state.depense_form_reset = True
-            # Réinitialiser les widgets
-            if "depense_noms" in st.session_state:
-                st.session_state.depense_noms = ""
-            for nom in st.session_state.get("selected_depenses", []):
-                if f"prix_{nom}" in st.session_state:
-                    st.session_state[f"prix_{nom}"] = 0.0
-            st.rerun()
 
     st.header("Supprimer une dépense")
     with st.form(key="delete_depense_form"):
