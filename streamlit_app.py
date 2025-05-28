@@ -419,7 +419,7 @@ elif selected_partie == "Statistiques":
     except Exception as e:
         st.error(f"Erreur lors du calcul du bénéfice : {e}")
     
-    st.subheader("Chiffre d’affaires et dépenses par mois")
+    st.subheader("Chiffre d'affaires et dépenses par mois")
     show_bar_plot = st.checkbox("Afficher le graphique des ventes et dépenses")
     if show_bar_plot:
         try:
@@ -433,10 +433,10 @@ elif selected_partie == "Statistiques":
             all_dates = []
             if not ventes.empty:
                 ventes["Date"] = pd.to_datetime(ventes["Date"], errors="coerce")
-                all_dates.extend(ventes["Date"].extend(ventes["Date"].dropna().tolist()))
+                all_dates += ventes["Date"].dropna().tolist()
             if not depenses.empty:
                 depenses["Date"] = pd.to_datetime(depenses["Date"], errors="coerce")
-                all_dates.extend(depenses["Date"].dropna().tolist())
+                all_dates += depenses["Date"].dropna().tolist()
             if all_dates:
                 all_months = sorted(set(pd.to_datetime(all_dates).strftime("%B %Y")), reverse=True)
                 other_months = [m for m in all_months if m not in default_months]
