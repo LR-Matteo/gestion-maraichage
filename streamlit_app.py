@@ -1,25 +1,44 @@
-import streamlit as st 
+import streamlit as st
 import pandas as pd
-from client_fonction import save_client, delete_client, load_clients_cache
-from produit_fonction import save_produit, delete_produit, modificate_price, load_produits_cache
-from ventes_fonction import save_vente, delete_vente, load_ventes_cache, get_ventes_affichage, get_vente_details
-from depenses_fonction import save_depense, delete_depense, load_depenses_cache, get_depense_details, get_depenses_affichage
-from statistiques_fonction import get_dernier_benefice, plot_benefice_evolution, datetime, relativedelta, plot_chiffre_affaires_vs_depenses
-from statistiques_fonction import plot_chiffre_affaires_per_client, plot_depenses_per_name, plot_chiffre_affaires_per_product
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from client_fonction import save_client, delete_client, load_clients_cache, upload_clients
+from produit_fonction import save_produit, delete_produit, load_produits_cache, modificate_price, upload_produits
+from ventes_fonction import save_vente, delete_vente, get_ventes_affichage, get_vente_details, upload_ventes, load_ventes_cache
+from depenses_fonction import save_depense, delete_depense, load_depenses_cache, get_depenses_affichage, get_depense_details, upload_depenses
+from statistiques_fonction import (
+    plot_benefice_evolution,
+    get_dernier_benefice,
+    plot_chiffre_affaires_vs_depenses,
+    plot_chiffre_affaires_per_product,
+    plot_chiffre_affaires_per_client,
+    plot_depenses_per_name
+)
 
-st.title("Gestion maraichage")
+st.title("Gestion Maraîchage")
 
-sous_partie = ["Ventes", "Dépenses", "Clients", "Produits", "Statistiques"]
-
+# Menu
+sous_partie = ["Ventes", "Dépenses", "Clients", "Produits", "Statistiques", "Gestion des données"]
 selected_parties = st.selectbox("Menu : ", sous_partie)
+
+# Alerte pour sauvegarder les données
+st.warning("⚠️ Important : Téléchargez vos fichiers CSV après chaque modification pour éviter de perdre vos données en cas de redémarrage de l’application.")
 
 if selected_parties == "Clients":
     st.header("Liste des clients")
     show_clients = st.checkbox("Afficher la liste des clients")
     if show_clients:
-        clients = load_clients_cache()
+        clients = load_clients_cache(_invalidate=True)
         if not clients.empty:
             st.dataframe(clients)
+            # Bouton pour télécharger clients.csv
+            csv = clients.to_csv(index=False)
+            st.download_button(
+                label="Télécharger clients.csv",
+                data=csv,
+                file_name="clients.csv",
+                mime="text/csv"
+            )
         else:
             st.write("Aucune donnée client à afficher.")
     
@@ -35,6 +54,7 @@ if selected_parties == "Clients":
         if submit_button:
             if save_client(nom, prenom, email, telephone):
                 st.success("Client ajouté avec succès !")
+                st.info("N’oubliez pas de télécharger clients.csv pour sauvegarder vos modifications.")
             else:
                 st.error("Erreur lors de l'ajout du client")
 
@@ -48,6 +68,7 @@ if selected_parties == "Clients":
         if delete_button:
             if delete_client(nom_del, prenom_del):
                 st.success("Client supprimé avec succès !")
+                st.info("N’oubliez pas de télécharger clients.csv pour sauvegarder vos modifications.")
             else:
                 st.error("Erreur lors de la suppression du client")
 
@@ -55,9 +76,17 @@ elif selected_parties == "Produits":
     st.header("Liste des produits")
     show_produits = st.checkbox("Afficher la liste des produits")
     if show_produits:
-        produits = load_produits_cache(_invalidate=True)  # Forcer le rechargement
+        produits = load_produits_cache(_invalidate=True)
         if not produits.empty:
             st.dataframe(produits)
+            # Bouton pour télécharger produits.csv
+            csv = produits.to_csv(index=False)
+            st.download_button(
+                label="Télécharger produits.csv",
+                data=csv,
+                file_name="produits.csv",
+                mime="text/csv"
+            )
         else:
             st.write("Aucune donnée produit à afficher.")
     
@@ -71,36 +100,40 @@ elif selected_parties == "Produits":
         if submit_button:
             if save_produit(nom_produit, prix_produit):
                 st.success("Produit ajouté avec succès !")
+                st.info("N’oubliez pas de télécharger produits.csv pour sauvegarder vos modifications.")
             else:
                 st.error("Erreur lors de l'ajout du produit")
 
     # Formulaire pour supprimer un produit
     st.header("Supprimer un produit")
     with st.form(key="delete_produit_form"):
-        nom_produit_del = st.text_input("Nom du produit")
+        produits = load_produits_cache()
+        produit_options = {row["Nom"]: row["Nom"] for _, row in produits.iterrows()}
+        nom_produit_del = st.selectbox("Produit à supprimer", list(produit_options.keys()))
         delete_button = st.form_submit_button("Supprimer le produit")
 
         if delete_button:
             if delete_produit(nom_produit_del):
                 st.success("Produit supprimé avec succès !")
+                st.info("N’oubliez pas de télécharger produits.csv pour sauvegarder vos modifications.")
             else:
                 st.error("Erreur lors de la suppression du produit")
 
-    # Formulaire pour modifier le prix d'un produit
-    st.header("Modifier le prix d'un produit")
+    # Formulaire pour modifier le prix
+    st.header("Modifier le prix d’un produit")
     with st.form(key="modify_price_form"):
         produits = load_produits_cache()
         produit_options = {row["Nom"]: row["Nom"] for _, row in produits.iterrows()}
-        nom_produit = st.selectbox("Sélectionner un produit", list(produit_options.keys()))
+        nom_produit = st.selectbox("Produit à modifier", list(produit_options.keys()))
         nouveau_prix = st.number_input("Nouveau prix (€/kg)", min_value=0.0, step=0.1)
         submit_button = st.form_submit_button("Modifier le prix")
 
         if submit_button:
             if modificate_price(nom_produit, nouveau_prix):
                 st.success("Prix modifié avec succès !")
+                st.info("N’oubliez pas de télécharger produits.csv pour sauvegarder vos modifications.")
             else:
                 st.error("Erreur lors de la modification du prix")
-
 
 elif selected_parties == "Ventes":
     st.header("Liste des ventes")
@@ -136,15 +169,22 @@ elif selected_parties == "Ventes":
                         st.dataframe(details)
                     else:
                         st.write("Aucun détail disponible pour cette vente.")
+                
+                # Bouton pour télécharger ventes.csv
+                csv = load_ventes_cache(_invalidate=True).to_csv(index=False)
+                st.download_button(
+                    label="Télécharger ventes.csv",
+                    data=csv,
+                    file_name="ventes.csv",
+                    mime="text/csv"
+                )
             else:
                 st.write("Aucune donnée vente à afficher.")
         except Exception as e:
             st.error(f"Erreur lors de l'affichage des ventes : {e}")
 
-# Formulaire pour ajouter une vente
+    # Formulaire pour ajouter une vente
     st.header("Ajouter une vente")
-
-    # Initialiser l'état du formulaire
     if "show_quantites" not in st.session_state:
         st.session_state.show_quantites = False
     if "selected_produits" not in st.session_state:
@@ -156,12 +196,10 @@ elif selected_parties == "Ventes":
         client_options = [f"{row['Nom']} {row['Prénom']}" for _, row in clients.iterrows()]
         client_selection = st.selectbox("Client", client_options)
         
-        # Sélection multiple de produits
         produits = load_produits_cache(_invalidate=True)
         produit_options = list(produits["Nom"])
         temp_selected_produits = st.multiselect("Produits", produit_options, default=st.session_state.selected_produits)
         
-        # Bouton pour confirmer la sélection des produits
         confirm_button = st.form_submit_button("Confirmer la sélection des produits")
         reset_button = st.form_submit_button("Réinitialiser le formulaire")
 
@@ -171,7 +209,6 @@ elif selected_parties == "Ventes":
         elif confirm_button:
             st.error("Veuillez sélectionner au moins un produit.")
 
-        # Afficher les champs de quantité si la sélection est confirmée
         quantites = []
         prix_totaux = []
         total_commande = 0.0
@@ -195,13 +232,12 @@ elif selected_parties == "Ventes":
             if not st.session_state.selected_produits:
                 st.error("Veuillez sélectionner au moins un produit.")
             else:
-                # Extraire nom et prénom du client
                 client_nom, client_prenom = client_selection.split(" ", 1) if " " in client_selection else (client_selection, "")
                 date_str = date.strftime("%Y-%m-%d")
                 try:
                     if save_vente(date_str, client_nom, client_prenom, st.session_state.selected_produits, quantites, prix_totaux):
                         st.success("Vente ajoutée avec succès !")
-                        # Réinitialiser après enregistrement
+                        st.info("N’oubliez pas de télécharger ventes.csv pour sauvegarder vos modifications.")
                         st.session_state.show_quantites = False
                         st.session_state.selected_produits = []
                     else:
@@ -210,7 +246,6 @@ elif selected_parties == "Ventes":
                     st.error(f"Erreur lors de l'enregistrement de la vente : {e}")
 
         if reset_button:
-            # Réinitialiser le formulaire
             st.session_state.show_quantites = False
             st.session_state.selected_produits = []
             st.rerun()
@@ -225,6 +260,7 @@ elif selected_parties == "Ventes":
             try:
                 if delete_vente(vente_id):
                     st.success("Vente supprimée avec succès !")
+                    st.info("N’oubliez pas de télécharger ventes.csv pour sauvegarder vos modifications.")
                 else:
                     st.error("Erreur lors de la suppression de la vente")
             except Exception as e:
@@ -260,15 +296,22 @@ elif selected_parties == "Dépenses":
                         st.dataframe(details)
                     else:
                         st.write("Aucun détail disponible pour cette date.")
+                
+                # Bouton pour télécharger depenses.csv
+                csv = load_depenses_cache(_invalidate=True).to_csv(index=False)
+                st.download_button(
+                    label="Télécharger depenses.csv",
+                    data=csv,
+                    file_name="depenses.csv",
+                    mime="text/csv"
+                )
             else:
                 st.write("Aucune donnée dépense à afficher.")
         except Exception as e:
             st.error(f"Erreur lors de l'affichage des dépenses : {e}")
 
-# Formulaire pour ajouter une dépense
+    # Formulaire pour ajouter une dépense
     st.header("Ajouter une dépense")
-
-    # Initialiser l'état du formulaire
     if "show_prix_depenses" not in st.session_state:
         st.session_state.show_prix_depenses = False
     if "selected_depenses" not in st.session_state:
@@ -278,12 +321,10 @@ elif selected_parties == "Dépenses":
         date = st.date_input("Date de la dépense")
         noms_depenses = st.text_input("Noms des dépenses (séparés par des virgules)", placeholder="Engrais, Arrosage, Semences")
 
-        # Boutons pour confirmer ou réinitialiser
         confirm_button = st.form_submit_button("Confirmer la sélection des dépenses")
         reset_button = st.form_submit_button("Réinitialiser le formulaire")
 
         if confirm_button and noms_depenses:
-            # Nettoyer et splitter les noms de dépenses
             temp_selected_depenses = [nom.strip() for nom in noms_depenses.split(",") if nom.strip()]
             if temp_selected_depenses:
                 st.session_state.show_prix_depenses = True
@@ -293,7 +334,6 @@ elif selected_parties == "Dépenses":
         elif confirm_button:
             st.error("Veuillez entrer au moins un nom de dépense.")
 
-        # Afficher les champs de prix si la sélection est confirmée
         prix_depenses = []
         total_depenses = 0.0
         if st.session_state.show_prix_depenses:
@@ -322,7 +362,7 @@ elif selected_parties == "Dépenses":
                             st.error(f"Erreur lors de l'enregistrement de la dépense '{nom}'.")
                     if success:
                         st.success("Dépenses ajoutées avec succès !")
-                        # Réinitialiser après enregistrement
+                        st.info("N’oubliez pas de télécharger depenses.csv pour sauvegarder vos modifications.")
                         st.session_state.show_prix_depenses = False
                         st.session_state.selected_depenses = []
                         st.rerun()
@@ -330,50 +370,9 @@ elif selected_parties == "Dépenses":
                     st.error(f"Erreur lors de l'enregistrement des dépenses : {e}")
 
         if reset_button:
-            # Réinitialiser le formulaire
             st.session_state.show_prix_depenses = False
             st.session_state.selected_depenses = []
             st.rerun()
-
-    # Supprimer une dépense
-    st.header("Supprimer une dépense")
-    with st.form(key="delete_depense_form"):
-        depense_id = st.number_input("ID de la dépense", min_value=1, step=1)
-        delete_button = st.form_submit_button("Supprimer")
-
-        if delete_button:
-            try:
-                if delete_depense(depense_id):
-                    st.success("Dépense supprimée !")
-                else:
-                    st.error("Erreur lors de la suppression.")
-            except Exception as e:
-                st.error(f"Erreur lors de la suppression de la dépense : {e}")
-
-elif selected_parties == "Dépenses":
-    st.header("Liste des dépenses")
-    show_depenses = st.checkbox("Afficher la liste des dépenses")
-    if show_depenses:
-        depenses = load_depenses_cache(_invalidate=True)
-        if not depenses.empty:
-            st.dataframe(depenses)
-        else:
-            st.write("Aucune donnée dépense à afficher.")
-
-    # Formulaire pour ajouter une dépense
-    st.header("Ajouter une dépense")
-    with st.form(key="depense_form"):
-        date = st.date_input("Date de la dépense")
-        nom_depense = st.text_input("Nom de la dépense")
-        prix_depense = st.number_input("Prix (€)", min_value=0.0, step=0.1)
-        submit_button = st.form_submit_button("Enregistrer la dépense")
-
-        if submit_button:
-            date_str = date.strftime("%Y-%m-%d")
-            if save_depense(date_str, nom_depense, prix_depense):
-                st.success("Dépense ajoutée avec succès !")
-            else:
-                st.error("Erreur lors de l'ajout de la dépense")
 
     # Formulaire pour supprimer une dépense
     st.header("Supprimer une dépense")
@@ -382,10 +381,107 @@ elif selected_parties == "Dépenses":
         delete_button = st.form_submit_button("Supprimer la dépense")
 
         if delete_button:
-            if delete_depense(depense_id):
-                st.success("Dépense supprimée avec succès !")
-            else:
-                st.error("Erreur lors de la suppression de la dépense")
+            try:
+                if delete_depense(depense_id):
+                    st.success("Dépense supprimée avec succès !")
+                    st.info("N’oubliez pas de télécharger depenses.csv pour sauvegarder vos modifications.")
+                else:
+                    st.error("Erreur lors de la suppression de la dépense")
+            except Exception as e:
+                st.error(f"Erreur lors de la suppression de la dépense : {e}")
+
+elif selected_parties == "Gestion des données":
+    st.header("Gestion des données")
+    st.write("Utilisez cette section pour charger vos fichiers CSV sauvegardés ou télécharger les données actuelles.")
+
+    # Upload des fichiers CSV
+    st.subheader("Charger des fichiers CSV")
+    with st.form(key="upload_form"):
+        client_file = st.file_uploader("Charger clients.csv", type="csv")
+        produit_file = st.file_uploader("Charger produits.csv", type="csv")
+        vente_file = st.file_uploader("Charger ventes.csv", type="csv")
+        depense_file = st.file_uploader("Charger depenses.csv", type="csv")
+        submit_button = st.form_submit_button("Charger les fichiers")
+
+        if submit_button:
+            try:
+                success = True
+                if client_file:
+                    if upload_clients(client_file):
+                        st.success("clients.csv chargé avec succès !")
+                    else:
+                        success = False
+                        st.error("Erreur lors du chargement de clients.csv")
+                if produit_file:
+                    if upload_produits(produit_file):
+                        st.success("produits.csv chargé avec succès !")
+                    else:
+                        success = False
+                        st.error("Erreur lors du chargement de produits.csv")
+                if vente_file:
+                    if upload_ventes(vente_file):
+                        st.success("ventes.csv chargé avec succès !")
+                    else:
+                        success = False
+                        st.error("Erreur lors du chargement de ventes.csv")
+                if depense_file:
+                    if upload_depenses(depense_file):
+                        st.success("depenses.csv chargé avec succès !")
+                    else:
+                        success = False
+                        st.error("Erreur lors du chargement de depenses.csv")
+                if success and any([client_file, produit_file, vente_file, depense_file]):
+                    st.info("Données chargées. Testez l’application pour vérifier.")
+                elif not any([client_file, produit_file, vente_file, depense_file]):
+                    st.warning("Aucun fichier sélectionné.")
+            except Exception as e:
+                st.error(f"Erreur lors du chargement des fichiers : {e}")
+
+    # Téléchargement de tous les CSV
+    st.subheader("Télécharger tous les fichiers CSV")
+    with st.form(key="download_all_form"):
+        st.write("Cliquez pour télécharger tous les fichiers CSV actuels.")
+        download_button = st.form_submit_button("Télécharger tous les CSV")
+
+        if download_button:
+            try:
+                clients = load_clients_cache(_invalidate=True)
+                produits = load_produits_cache(_invalidate=True)
+                ventes = load_ventes_cache(_invalidate=True)
+                depenses = load_depenses_cache(_invalidate=True)
+
+                st.download_button(
+                    label="Télécharger clients.csv",
+                    data=clients.to_csv(index=False),
+                    file_name="clients.csv",
+                    mime="text/csv",
+                    key="download_clients"
+                )
+                st.download_button(
+                    label="Télécharger produits.csv",
+                    data=produits.to_csv(index=False),
+                    file_name="produits.csv",
+                    mime="text/csv",
+                    key="download_produits"
+                )
+                st.download_button(
+                    label="Télécharger ventes.csv",
+                    data=ventes.to_csv(index=False),
+                    file_name="ventes.csv",
+                    mime="text/csv",
+                    key="download_ventes"
+                )
+                st.download_button(
+                    label="Télécharger depenses.csv",
+                    data=depenses.to_csv(index=False),
+                    file_name="depenses.csv",
+                    mime="text/csv",
+                    key="download_depenses"
+                )
+            except Exception as e:
+                st.error(f"Erreur lors du téléchargement des fichiers : {e}")
+
+
 
 
 elif selected_parties == "Statistiques":
