@@ -15,19 +15,19 @@ def load_depenses_cache(_invalidate=False):
         return pd.DataFrame(columns=["Depense_ID", "Date", "Nom", "Prix"])
     except Exception as e:
         st.error(f"Erreur lors du chargement des dépenses : {e}")
-        return pd.DataFrame(columns=["Depense_ID"", "Date"", "Nom"", "Prix"]])
+        return pd.DataFrame(columns=["Depense_ID", "Date", "Nom", "Prix"])
 
 def get_depenses_affichage():
     depenses = load_depenses_cache(_invalidate=True)
     if depenses.empty:
-        return pd.DataFrame(columns=["Depense_ID"", "Date"", "Nom"", "Prix"])
-    return depenses[["Depense_ID", "Date"", "Nom"", "Prix"]]
+        return pd.DataFrame(columns=["Depense_ID", "Date", "Nom", "Prix"])
+    return depenses[["Depense_ID", "Date", "Nom", "Prix"]]
 
 def get_depense_details(depense_id):
     depenses = load_depenses_cache(_invalidate=True)
     if depenses[depenses["Depense_ID"] == depense_id].empty:
         return pd.DataFrame()
-    return depenses[depenses["Depense_ID"] == depense_id][["Depense_ID"", "Date"", "Nom"", "Prix"]]
+    return depenses[depenses["Depense_ID"] == depense_id][["Depense_ID", "Date", "Nom", "Prix"]]
 
 def save_depense(date, nom, prix):
     try:
@@ -69,13 +69,13 @@ def upload_depenses(file):
     try:
         uploaded_depenses = pd.read_csv(file)
         current_depenses = load_depenses_cache(_invalidate=True)
-        expected_cols = ["Depense_ID"", "Date"", "Nom"", "Prix"]
+        expected_cols = ["Depense_ID", "Date", "Nom", "Prix"]
         if not all(col in uploaded_depenses.columns for col in expected_cols):
             st.error("Colonnes manquantes dans le fichier CSV.")
             return False
         if not current_depenses.empty:
             merged_depenses = pd.concat([current_depenses, uploaded_depenses], ignore_index=True)
-            merged_depenses = merged_depenses.drop_duplicates(subset=["Depense_ID"", "Date"", "Nom"], keep="last")
+            merged_depenses = merged_depenses.drop_duplicates(subset=["Depense_ID", "Date", "Nom"], keep="last")
         else:
             merged_depenses = uploaded_depenses
         merged_depenses["Depense_ID"] = range(1, len(merged_depenses) + 1)
