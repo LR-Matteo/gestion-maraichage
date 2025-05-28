@@ -488,8 +488,6 @@ elif selected_partie == "Statistiques":
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.warning("Aucun graphique généré pour les ventes et dépenses.")
-            except:
-                pass
         except Exception as e:
             st.error(f"Erreur lors de la génération du graphique : {e}")
     
@@ -516,8 +514,8 @@ elif selected_partie == "Statistiques":
                         st.warning("Aucun tableau généré pour le chiffre d'affaires par produit")
                 except:
                     pass
-                except Exception as e:
-                    st.error(f"Erreur lors de la génération du graphique : {e}")
+    except Exception as e:
+        st.error(f"Erreur lors de la génération du graphique : {e}")
     
     st.subheader("Chiffre d'affaires par client")
     try:
@@ -542,10 +540,11 @@ elif selected_partie == "Statistiques":
                         st.warning("Aucun tableau généré pour le chiffre d'affaires par client.")
                 except:
                     pass
-                except Exception as e:
-                    st.error(f"Erreur lors de la génération du graphique : {e}")
+    except Exception as e:
+        st.error(f"Erreur lors de la génération du graphique : {e}")
     
     st.subheader("Dépenses par type de dépense")
+
     try:
         show_depense_plot = st.checkbox("Afficher le graphique des dépenses par type")
         if show_depense_plot:
@@ -568,5 +567,5 @@ elif selected_partie == "Statistiques":
                         st.warning("Aucun tableau généré pour les dépenses par type")
                 except:
                     pass
-                except Exception as e:
-                    st.error(f"Erreur lors de la génération du graphique : {e}")
+    except Exception as e:
+        st.error(f"Erreur lors de la génération du graphique : {e}")
