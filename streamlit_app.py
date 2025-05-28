@@ -263,12 +263,11 @@ elif selected_partie == "Dépenses":
                 cols[2].write("Total (€)")
                 cols[3].write("Détails")
                 for index, row in depenses.iterrows():
-                    cols = st.columns([1, 2, 3, 2, 1])
+                    cols = st.columns([1, 2, 3, 2])
                     cols[0].write(row["Depense_ID"])
                     cols[1].write(row["Date"])
-                    cols[2].write(row["Noms"])
-                    cols[3].write(f"{row['Total']:.2f}")
-                    if cols[4].checkbox("Voir", key=f"detail_depense_{row['Depense_ID']}"):
+                    cols[2].write(f"{row['Total']:.2f}")
+                    if cols[3].checkbox("Voir", key=f"detail_depense_{row['Depense_ID']}"):
                         selected_depenses.append(row["Depense_ID"])
                 for depense_id in selected_depenses:
                     st.subheader(f"Détails de la dépense {depense_id}")
