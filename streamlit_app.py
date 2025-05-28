@@ -425,7 +425,7 @@ elif selected_partie == "Statistiques":
         try:
             current_date = datetime.now()
             default_months = [
-                (current_date - relativedelta.months(i)).strftime("%B %Y")
+                (current_date - relativedelta(months=i)).strftime("%B %Y")
                 for i in range(2, -1, -1)
             ]
             ventes = load_ventes_cache(_invalidate=True)
@@ -469,7 +469,7 @@ elif selected_partie == "Statistiques":
             with col1:
                 start_date = st.date_input("Date de début", value=None, key="produit_start")
             with col2:
-                end_date = date_input("Date de fin", value=None, key="produit_end")
+                end_date = st.date_input("Date de fin", value=None, key="produit_end")
             start_date_str = start_date.strftime("%Y-%m-%d") if start_date else None
             end_date_str = end_date.strftime("%Y-%m-%d") if end_date else None
             if start_date and end_date and start_date > end_date:
