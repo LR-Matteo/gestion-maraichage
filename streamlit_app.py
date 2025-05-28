@@ -448,7 +448,7 @@ elif selected_partie == "Statistiques":
         else:
             st.write("Aucune donnée disponible pour calculer le bénéfice.")
     except Exception as e:
-        st.error(f"Erreur lors du calcul du bénéfice : {e}"")
+        st.error(f"Erreur lors du calcul du bénéfice : {e}")
     
     st.subheader("Chiffre d’affaires et dépenses par mois")
     show_bar_plot = st.checkbox("Afficher le graphique des ventes et dépenses")
