@@ -491,7 +491,7 @@ elif selected_partie == "Statistiques":
             except:
                 pass
         except Exception as e:
-            st.error(f"Erreur lors de la génération du graphique : {e}"")
+            st.error(f"Erreur lors de la génération du graphique : {e}")
     
     st.subheader("Chiffre d'affaires par produit")
     try:
@@ -517,7 +517,7 @@ elif selected_partie == "Statistiques":
                 except:
                     pass
                 except Exception as e:
-                    st.error(f"Erreur lors de la génération du graphique : {e}"")
+                    st.error(f"Erreur lors de la génération du graphique : {e}")
     
     st.subheader("Chiffre d'affaires par client")
     try:
