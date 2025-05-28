@@ -26,8 +26,8 @@ def get_depenses_affichage():
 def get_depense_details(depense_id):
     depenses = load_depenses_cache(_invalidate=True)
     if depenses[depenses["Depense_ID"] == depense_id].empty:
-        return None
-    return depenses[depenses["Depense_ID"] == depense_id].iloc[0].to_dict()
+        return pd.DataFrame()
+    return depenses[depenses["Depense_ID"] == depense_id][["Depense_ID", "Date", "Nom", "Prix"]]
 
 def save_depense(date, nom, prix):
     try:
@@ -80,7 +80,6 @@ def upload_depenses(file):
             merged_depenses = merged_depenses.drop_duplicates(subset=["Depense_ID", "Date", "Nom"], keep="last")
         else:
             merged_depenses = uploaded_depenses
-        # Réindexer les Depense_ID
         merged_depenses["Depense_ID"] = range(1, len(merged_depenses) + 1)
         merged_depenses.to_csv(DEPENSES_FILE, index=False)
         with open(DEPENSES_FILE, "r") as f:

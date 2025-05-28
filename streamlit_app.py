@@ -183,26 +183,29 @@ elif selected_partie == "Ventes":
         st.session_state.show_quantites = False
     if "selected_produits" not in st.session_state:
         st.session_state.selected_produits = []
+    if "vente_form_reset" not in st.session_state:
+        st.session_state.vente_form_reset = False
 
     with st.form(key="vente_form"):
         date = st.date_input("Date de la vente")
         clients = load_clients_cache(_invalidate=True)
         client_options = [f"{row['Nom']} {row['Prénom']}" for _, row in clients.iterrows()]
-        client_selection = st.selectbox("Client", client_options)
+        client_selection = st.selectbox("Client", client_options, key="vente_client")
         produits = load_produits_cache(_invalidate=True)
         produit_options = produits["Nom"].tolist()
-        temp_selected_produits = st.multiselect("Produits", produit_options, default=st.session_state.selected_produits)
+        temp_selected_produits = st.multiselect("Produits", produit_options, default=st.session_state.selected_produits, key="vente_produits")
         confirm_button = st.form_submit_button("Confirmer la sélection des produits")
         reset_button = st.form_submit_button("Réinitialiser le formulaire")
         if confirm_button and temp_selected_produits:
             st.session_state.show_quantites = True
             st.session_state.selected_produits = temp_selected_produits
+            st.session_state.vente_form_reset = False
         elif confirm_button:
             st.error("Veuillez sélectionner au moins un produit.")
         quantites = []
         prix_totaux = []
         total_commande = 0.0
-        if st.session_state.show_quantites:
+        if st.session_state.show_quantites and not st.session_state.vente_form_reset:
             st.subheader("Saisir les quantités")
             for produit in st.session_state.selected_produits:
                 st.write(f"**{produit}**")
@@ -226,6 +229,7 @@ elif selected_partie == "Ventes":
                         st.success("Vente ajoutée avec succès !")
                         st.session_state.show_quantites = False
                         st.session_state.selected_produits = []
+                        st.session_state.vente_form_reset = True
                         st.rerun()
                     else:
                         st.error("Erreur lors de l'ajout de la vente")
@@ -234,6 +238,15 @@ elif selected_partie == "Ventes":
         if reset_button:
             st.session_state.show_quantites = False
             st.session_state.selected_produits = []
+            st.session_state.vente_form_reset = True
+            # Réinitialiser les widgets
+            if "vente_client" in st.session_state:
+                st.session_state.vente_client = client_options[0] if client_options else ""
+            if "vente_produits" in st.session_state:
+                st.session_state.vente_produits = []
+            for produit in produit_options:
+                if f"quantite_{produit}" in st.session_state:
+                    st.session_state[f"quantite_{produit}"] = 0.0
             st.rerun()
 
     st.header("Supprimer une vente")
@@ -251,21 +264,21 @@ elif selected_partie == "Ventes":
 
 elif selected_partie == "Dépenses":
     st.header("Liste des dépenses")
-    show_depenses = st.checkbox("Afficher")
+    show_depenses = st.checkbox("Afficher la liste des dépenses")
     if show_depenses:
         try:
             depenses = get_depenses_affichage()
             if not depenses.empty:
                 st.write("Sélectionnez une dépense pour voir les détails :")
                 selected_depenses = []
-                cols = st.columns([1, 2, 2, 2, 1])
+                cols = st.columns([1, 2, 3, 2, 1])
                 cols[0].write("Depense_ID")
                 cols[1].write("Date")
                 cols[2].write("Nom")
                 cols[3].write("Prix (€)")
                 cols[4].write("Détails")
                 for index, row in depenses.iterrows():
-                    cols = st.columns([1, 2, 2, 2, 1])
+                    cols = st.columns([1, 2, 3, 2, 1])
                     cols[0].write(row["Depense_ID"])
                     cols[1].write(row["Date"])
                     cols[2].write(row["Nom"])
@@ -296,10 +309,12 @@ elif selected_partie == "Dépenses":
         st.session_state.show_prix_depenses = False
     if "selected_depenses" not in st.session_state:
         st.session_state.selected_depenses = []
+    if "depense_form_reset" not in st.session_state:
+        st.session_state.depense_form_reset = False
 
     with st.form(key="depense_form"):
         date = st.date_input("Date de la dépense")
-        noms_depenses = st.text_input("Noms des dépenses (séparés par des virgules)", placeholder="Engrais, Arrosage, Semences")
+        noms_depenses = st.text_input("Noms des dépenses (séparés par des virgules)", placeholder="Engrais, Arrosage, Semences", key="depense_noms")
         confirm_button = st.form_submit_button("Confirmer la sélection des dépenses")
         reset_button = st.form_submit_button("Réinitialiser le formulaire")
         if confirm_button and noms_depenses:
@@ -307,13 +322,14 @@ elif selected_partie == "Dépenses":
             if temp_selected_depenses:
                 st.session_state.show_prix_depenses = True
                 st.session_state.selected_depenses = temp_selected_depenses
+                st.session_state.depense_form_reset = False
             else:
                 st.error("Veuillez entrer au moins un nom de dépense valide.")
         elif confirm_button:
             st.error("Veuillez entrer au moins un nom de dépense.")
         prix_depenses = []
         total_depenses = 0.0
-        if st.session_state.show_prix_depenses:
+        if st.session_state.show_prix_depenses and not st.session_state.depense_form_reset:
             st.subheader("Saisir les prix des dépenses")
             for nom in st.session_state.selected_depenses:
                 prix = st.number_input(f"Prix (€) pour {nom}", min_value=0.0, step=0.1, key=f"prix_{nom}")
@@ -337,12 +353,20 @@ elif selected_partie == "Dépenses":
                         st.success("Dépenses ajoutées avec succès !")
                         st.session_state.show_prix_depenses = False
                         st.session_state.selected_depenses = []
+                        st.session_state.depense_form_reset = True
                         st.rerun()
                 except Exception as e:
                     st.error(f"Erreur lors de l'enregistrement des dépenses : {e}")
         if reset_button:
             st.session_state.show_prix_depenses = False
             st.session_state.selected_depenses = []
+            st.session_state.depense_form_reset = True
+            # Réinitialiser les widgets
+            if "depense_noms" in st.session_state:
+                st.session_state.depense_noms = ""
+            for nom in st.session_state.get("selected_depenses", []):
+                if f"prix_{nom}" in st.session_state:
+                    st.session_state[f"prix_{nom}"] = 0.0
             st.rerun()
 
     st.header("Supprimer une dépense")
@@ -418,29 +442,29 @@ elif selected_partie == "Statistiques":
         if derniere_date:
             couleur = "green" if dernier_benefice >= 0 else "red"
             st.markdown(
-                f"<h3 style='color:{couleur};'>Bénéfice au {derniere_date.strftime('%Y-%m-%d')} : {dernier_benefice:.2f} €</h3>",
+                f"<h3 style='color:{couleur}'>Bénéfice au {derniere_date.strftime('%Y-%m-%d')} : {dernier_benefice:.2f} €</h3>",
                 unsafe_allow_html=True
             )
         else:
             st.write("Aucune donnée disponible pour calculer le bénéfice.")
     except Exception as e:
-        st.error(f"Erreur lors du calcul du bénéfice : {e}")
-
-    st.subheader("Chiffre d'affaires et dépenses par mois")
+        st.error(f"Erreur lors du calcul du bénéfice : {e}"")
+    
+    st.subheader("Chiffre d’affaires et dépenses par mois")
     show_bar_plot = st.checkbox("Afficher le graphique des ventes et dépenses")
     if show_bar_plot:
         try:
             current_date = datetime.now()
             default_months = [
-                (current_date - relativedelta(months=i)).strftime("%B %Y")
+                (current_date - relativedelta.months(i)).strftime("%B %Y")
                 for i in range(2, -1, -1)
             ]
             ventes = load_ventes_cache(_invalidate=True)
             depenses = load_depenses_cache(_invalidate=True)
             all_dates = []
             if not ventes.empty:
-                vendas["Date"] = pd.to_datetime(ventes["Date"], errors="coerce")
-                all_dates.extend(ventes["Date"].dropna().tolist())
+                ventes["Date"] = pd.to_datetime(ventes["Date"], errors="coerce")
+                all_dates.extend(ventes["Date"].extend(ventes["Date"].dropna().tolist())
             if not depenses.empty:
                 depenses["Date"] = pd.to_datetime(depenses["Date"], errors="coerce")
                 all_dates.extend(depenses["Date"].dropna().tolist())
@@ -464,74 +488,85 @@ elif selected_partie == "Statistiques":
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.warning("Aucun graphique généré pour les ventes et dépenses.")
+            except:
+                pass
         except Exception as e:
-            st.error(f"Erreur lors de la génération du graphique : {e}")
-
+            st.error(f"Erreur lors de la génération du graphique : {e}"")
+    
     st.subheader("Chiffre d'affaires par produit")
-    show_produit_plot = st.checkbox("Afficher le graphique du chiffre d'affaires par produit")
-    if show_produit_plot:
-        st.write("Sélectionnez une période (optionnel) :")
-        col1, col2 = st.columns(2)
-        with col1:
-            start_date = st.date_input("Date de début", value=None, key="produit_start")
-        with col2:
-            end_date = st.date_input("Date de fin", value=None, key="produit_end")
-        start_date_str = start_date.strftime("%Y-%m-%d") if start_date else None
-        end_date_str = end_date.strftime("%Y-%m-%d") if end_date else None
-        if start_date and end_date and start_date > end_date:
-            st.error("La date de début doit être antérieure à la date de fin.")
-        else:
-            try:
-                fig = plot_chiffre_affaires_per_product(start_date_str, end_date_str)
-                if fig:
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning("Aucun graphique généré pour le chiffre d'affaires par produit.")
-            except Exception as e:
-                st.error(f"Erreur lors de la génération du graphique : {e}")
-
+    try:
+        show_produit_plot = st.checkbox("Afficher le graphique du chiffre d'affaires par produit")
+        if show_produit_plot:
+            st.write("Sélectionnez une période (optionnel) :")
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input("Date de début", value=None, key="produit_start")
+            with col2:
+                end_date = date_input("Date de fin", value=None, key="produit_end")
+            start_date_str = start_date.strftime("%Y-%m-%d") if start_date else None
+            end_date_str = end_date.strftime("%Y-%m-%d") if end_date else None
+            if start_date and end_date and start_date > end_date:
+                st.error("La date de début doit être antérieure à positieve la date de fin.")
+            else:
+                try:
+                    fig = plot_chiffre_affaires_per_product(start_date_str, end_date_str)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.warning("Aucun tableau généré pour le chiffre d'affaires par produit")
+                except:
+                    pass
+                except Exception as e:
+                    st.error(f"Erreur lors de la génération du graphique : {e}"")
+    
     st.subheader("Chiffre d'affaires par client")
-    show_client_plot = st.checkbox("Afficher le graphique du chiffre d'affaires par client")
-    if show_client_plot:
-        st.write("Sélectionnez une période (optionnel) :")
-        col1, col2 = st.columns(2)
-        with col1:
-            start_date = st.date_input("Date de début", value=None, key="client_start")
-        with col2:
-            end_date = st.date_input("Date de fin", value=None, key="client_end")
-        start_date_str = start_date.strftime("%Y-%m-%d") if start_date else None
-        end_date_str = end_date.strftime("%Y-%m-%d") if end_date else None
-        if start_date and end_date and start_date > end_date:
-            st.error("La date de début doit être antérieure à la date de fin.")
-        else:
-            try:
-                fig = plot_chiffre_affaires_per_client(start_date_str, end_date_str)
-                if fig:
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning("Aucun tableau généré pour le chiffre d'affaires par client.")
-            except Exception as e:
-                st.error(f"Erreur lors de la génération du graphique : {e}")
-
+    try:
+        show_client_plot = st.checkbox("Afficher le graphique du chiffre d'affaires par client")
+        if show_client_plot:
+            st.write("Sélectionnez une période (optionnel) :")
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input("Date de début", value=None, key="client_start")
+            with col2:
+                end_date = st.date_input("Date de fin", value=None, key="client_end")
+            start_date_str = start_date.strftime("%Y-%m-%d") if start_date else None
+            end_date_str = end_date.strftime("%Y-%m-%d") if end_date else None
+            if start_date and end_date and start_date > end_date:
+                st.error("La date de début doit être antérieure à la date de fin.")
+            else:
+                try:
+                    fig = plot_chiffre_affaires_per_client(start_date_str, end_date_str)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.warning("Aucun tableau généré pour le chiffre d'affaires par client.")
+                except:
+                    pass
+                except Exception as e:
+                    st.error(f"Erreur lors de la génération du graphique : {e}")
+    
     st.subheader("Dépenses par type de dépense")
-    show_depense_plot = st.checkbox("Afficher le graphique des dépenses par type")
-    if show_depense_plot:
-        st.write("Sélectionnez une période (optionnel) :")
-        col1, col2 = st.columns(2)
-        with col1:
-            start_date = st.date_input("Date de début", value=None, key="depense_start")
-        with col2:
-            end_date = st.date_input("Date de fin", value=None, key="depense_end")
-        start_date_str = start_date.strftime("%Y-%m-%d") if start_date else None
-        end_date_str = end_date.strftime("%Y-%m-%d") if end_date else None
-        if start_date and end_date and start_date and start_date > end_date:
-            st.error("La date de début doit être antérieure à la date de fin.")
-        else:
-            try:
-                fig = plot_depenses_per_name(start_date_str, end_date_str)
-                if fig:
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning("Aucun tableau généré pour les dépenses par type")
-            except Exception as e:
-                st.error("Erreur lors de la génération du graphique : {e}")
+    try:
+        show_depense_plot = st.checkbox("Afficher le graphique des dépenses par type")
+        if show_depense_plot:
+            st.write("Sélectionnez une période (optionnel) :")
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input("Date de début", value=None, key="depense_start")
+            with col2:
+                end_date = st.date_input("Date de fin", value=None, key="depense_end")
+            start_date_str = start_date.strftime("%Y-%m-%d") if start_date else None
+            end_date_str = end_date.strftime("%Y-%m-%d") if end_date else None
+            if start_date and end_date and start_date > end_date:
+                st.error("La date de début doit être antérieure à la date de fin.")
+            else:
+                try:
+                    fig = plot_depenses_per_name(start_date_str, end_date_str)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.warning("Aucun tableau généré pour les dépenses par type")
+                except:
+                    pass
+                except Exception as e:
+                    st.error(f"Erreur lors de la génération du graphique : {e}")
