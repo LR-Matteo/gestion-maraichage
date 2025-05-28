@@ -464,7 +464,7 @@ elif selected_partie == "Statistiques":
             all_dates = []
             if not ventes.empty:
                 ventes["Date"] = pd.to_datetime(ventes["Date"], errors="coerce")
-                all_dates.extend(ventes["Date"].extend(ventes["Date"].dropna().tolist())
+                all_dates.extend(ventes["Date"].extend(ventes["Date"].dropna().tolist()))
             if not depenses.empty:
                 depenses["Date"] = pd.to_datetime(depenses["Date"], errors="coerce")
                 all_dates.extend(depenses["Date"].dropna().tolist())
