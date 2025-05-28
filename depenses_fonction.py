@@ -3,7 +3,7 @@ import streamlit as st
 import os
 from github_utils import push_to_github
 
-# Créer le dossier data/ s'il n'existe pas
+# Créer le dossier data/ s'il n’existe pas
 os.makedirs("data", exist_ok=True)
 DEPENSES_FILE = "data/depenses.csv"
 
@@ -18,23 +18,23 @@ def load_depenses_cache(_invalidate=False):
         return pd.DataFrame(columns=["Depense_ID", "Date", "Nom", "Prix"])
 
 def get_depenses_affichage():
-    depenses = load_depenses_cache()
+    depenses = load_depenses_cache(_invalidate=True)
     if depenses.empty:
         return pd.DataFrame(columns=["Depense_ID", "Date", "Nom", "Prix"])
     return depenses[["Depense_ID", "Date", "Nom", "Prix"]]
 
 def get_depense_details(depense_id):
-    depenses = load_depenses_cache()
+    depenses = load_depenses_cache(_invalidate=True)
     if depenses[depenses["Depense_ID"] == depense_id].empty:
         return None
-    return depenses[depenses["Depense_ID"] == depense_id].iloc[0]
+    return depenses[depenses["Depense_ID"] == depense_id].iloc[0].to_dict()
 
 def save_depense(date, nom, prix):
     try:
         depenses = load_depenses_cache(_invalidate=True)
-        new_id = depenses["Depense_ID"].max() + 1 if not depenses.empty else 1
+        new_depense_id = int(depenses["Depense_ID"].max() + 1 if not depenses.empty else 1)
         new_depense = pd.DataFrame([{
-            "Depense_ID": new_id,
+            "Depense_ID": new_depense_id,
             "Date": date,
             "Nom": nom,
             "Prix": prix
@@ -43,17 +43,18 @@ def save_depense(date, nom, prix):
         depenses.to_csv(DEPENSES_FILE, index=False)
         with open(DEPENSES_FILE, "r") as f:
             content = f.read()
-        push_to_github("data/depenses.csv", content, f"Ajout de la dépense {nom}")
+        push_to_github("data/depenses.csv", content, f"Ajout de la dépense {nom} (ID {new_depense_id})")
         load_depenses_cache.clear()
         return True
     except Exception as e:
-        st.error(f"Erreur lors de l'enregistrement de la dépense : {e}")
+        st.error(f"Erreur lors de l’enregistrement de la dépense : {e}")
         return False
 
 def delete_depense(depense_id):
     try:
         depenses = load_depenses_cache(_invalidate=True)
         if depenses[depenses["Depense_ID"] == depense_id].empty:
+            st.error("Dépense non trouvée.")
             return False
         depenses = depenses[depenses["Depense_ID"] != depense_id]
         depenses.to_csv(DEPENSES_FILE, index=False)
@@ -72,14 +73,14 @@ def upload_depenses(file):
         current_depenses = load_depenses_cache(_invalidate=True)
         expected_cols = ["Depense_ID", "Date", "Nom", "Prix"]
         if not all(col in uploaded_depenses.columns for col in expected_cols):
+            st.error("Colonnes manquantes dans le fichier CSV.")
             return False
         if not current_depenses.empty:
             merged_depenses = pd.concat([current_depenses, uploaded_depenses], ignore_index=True)
-            merged_depenses = merged_depenses.drop_duplicates(
-                subset=["Depense_ID", "Date"], keep="last"
-            )
+            merged_depenses = merged_depenses.drop_duplicates(subset=["Depense_ID", "Date", "Nom"], keep="last")
         else:
             merged_depenses = uploaded_depenses
+        # Réindexer les Depense_ID
         merged_depenses["Depense_ID"] = range(1, len(merged_depenses) + 1)
         merged_depenses.to_csv(DEPENSES_FILE, index=False)
         with open(DEPENSES_FILE, "r") as f:
