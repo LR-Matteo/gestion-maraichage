@@ -257,12 +257,11 @@ elif selected_partie == "Dépenses":
             if not depenses.empty:
                 st.write("Sélectionnez une dépense pour voir les détails :")
                 selected_depenses = []
-                cols = st.columns([1, 2, 3, 2, 1])
+                cols = st.columns([1, 2, 3, 2])
                 cols[0].write("Depense_ID")
                 cols[1].write("Date")
-                cols[2].write("Noms")
-                cols[3].write("Total (€)")
-                cols[4].write("Détails")
+                cols[2].write("Total (€)")
+                cols[3].write("Détails")
                 for index, row in depenses.iterrows():
                     cols = st.columns([1, 2, 3, 2, 1])
                     cols[0].write(row["Depense_ID"])
