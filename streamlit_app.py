@@ -300,7 +300,6 @@ elif selected_partie == "Dépenses":
         date = st.date_input("Date de la dépense")
         noms_depenses = st.text_input("Noms des dépenses (séparés par des virgules)", placeholder="Engrais, Arrosage, Semences", key="depense_noms")
         confirm_button = st.form_submit_button("Confirmer la sélection des dépenses")
-        reset_button = st.form_submit_button("Réinitialiser le formulaire")
         if confirm_button and noms_depenses:
             temp_selected_depenses = [nom.strip() for nom in noms_depenses.split(",") if nom.strip()]
             if temp_selected_depenses:
@@ -338,16 +337,6 @@ elif selected_partie == "Dépenses":
                         st.error("Erreur lors de l'enregistrement des dépenses.")
                 except Exception as e:
                     st.error(f"Erreur lors de l'enregistrement des dépenses : {e}")
-        if reset_button:
-            st.session_state.show_prix_depenses = False
-            st.session_state.selected_depenses = []
-            st.session_state.depense_form_reset = True
-            if "depense_noms" in st.session_state:
-                st.session_state.depense_noms = ""
-            for nom in st.session_state.get("selected_depenses", []):
-                if f"prix_{nom}" in st.session_state:
-                    st.session_state[f"prix_{nom}"] = 0.0
-            st.rerun()
 
     st.header("Supprimer une dépense")
     with st.form(key="delete_depense_form"):
