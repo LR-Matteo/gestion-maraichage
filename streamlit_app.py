@@ -4,8 +4,8 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from client_fonction import save_client, delete_client, load_clients_cache, upload_clients
 from produit_fonction import save_produit, delete_produit, load_produits_cache, modificate_price, upload_produits
-from vente_fonction import save_vente, delete_vente, get_ventes_affichage, get_vente_details, upload_ventes, load_ventes_cache
-from depense_fonction import save_depense, delete_depense, load_depenses_cache, get_depenses_affichage, get_depense_details, upload_depenses
+from ventes_fonction import save_vente, delete_vente, get_ventes_affichage, get_vente_details, upload_ventes, load_ventes_cache
+from depenses_fonction import save_depense, delete_depense, load_depenses_cache, get_depenses_affichage, get_depense_details, upload_depenses
 from statistiques_fonction import (
     plot_benefice_evolution,
     get_dernier_benefice,
