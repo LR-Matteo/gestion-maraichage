@@ -21,9 +21,6 @@ def get_benefice_par_date():
     if ventes.empty and depenses.empty:
         return pd.DataFrame(columns=["Date", "Benefice_Cumule"])
 
-    # Filtrer les ventes validées
-    ventes = ventes[ventes["Valide"] == True] if not ventes.empty else ventes
-
     # Agréger les ventes par date
     ventes_par_date = ventes.groupby("Date")["Prix"].sum().reset_index() if not ventes.empty else pd.DataFrame(columns=["Date", "Prix"])
     ventes_par_date.rename(columns={"Prix": "Ventes"}, inplace=True)
@@ -111,9 +108,6 @@ def get_chiffre_affaires_et_depenses_par_mois(selected_months=None):
 
     if ventes.empty and depenses.empty:
         return pd.DataFrame(columns=["Mois_Annee", "Type", "Montant"])
-
-    # Filtrer les ventes validées
-    ventes = ventes[ventes["Valide"] == True] if not ventes.empty else ventes
 
     # Convertir les dates en datetime
     try:
@@ -206,9 +200,6 @@ def get_chiffre_affaires_par_produit(start_date=None, end_date=None):
     if ventes.empty or produits.empty:
         return pd.DataFrame(columns=["Produit", "Montant"])
 
-    # Filtrer les ventes validées
-    ventes = ventes[ventes["Valide"] == True]
-
     # Convertir les dates
     try:
         ventes["Date"] = pd.to_datetime(ventes["Date"], format="%Y-%m-%d", errors="coerce")
@@ -290,9 +281,6 @@ def get_chiffre_affaires_per_client(start_date=None, end_date=None):
 
     if ventes.empty or clients.empty:
         return pd.DataFrame(columns=["Client", "Montant"])
-
-    # Filtrer les ventes validées
-    ventes = ventes[ventes["Valide"] == True]
 
     # Convertir les dates
     try:

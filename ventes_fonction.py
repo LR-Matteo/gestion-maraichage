@@ -1,148 +1,98 @@
 import pandas as pd
 import streamlit as st
-import os
-from datetime import datetime
-from client_fonction import load_clients_cache, find_client_id
-from produit_fonction import load_produits_cache, find_produit_id
+from client_fonction import load_clients_cache
+from produit_fonction import load_produits_cache
 
-def load_ventes():
-    """
-    Charge le csv ventes s'il existe ou le crée sinon.
-    """
-    ventes_file = "data/ventes.csv"
-    try:
-        ventes = pd.read_csv(ventes_file)
-        expected_columns = ["Vente_ID", "Date", "Client_ID", "Produit_ID", "Quantité", "Prix"]
-        if not all(col in ventes.columns for col in expected_columns):
-            st.error("Colonnes incorrectes dans ventes.csv")
-            ventes = pd.DataFrame(columns=expected_columns)
-        return ventes
-    except FileNotFoundError:
-        st.warning("Aucune base de données ventes trouvée, création d'un fichier vide.")
-        os.makedirs("data", exist_ok=True)
-        ventes = pd.DataFrame(columns=["Vente_ID", "Date", "Client_ID", "Produit_ID", "Quantité", "Prix"])
-        ventes.to_csv(ventes_file, index=False)
-        return ventes
-    except pd.errors.ParserError:
-        st.error("Erreur de format dans le fichier ventes.csv")
-        return pd.DataFrame(columns=["Vente_ID", "Date", "Client_ID", "Produit_ID", "Quantité", "Prix"])
+# Chemin vers le fichier ventes.csv
+VENTES_FILE = "data/ventes.csv"
 
 @st.cache_data
-def load_ventes_cache(_invalidate=None):
+def load_ventes_cache(_invalidate=False):
     """
-    Garde en mémoire les données. Utilise un paramètre pour invalider le cache.
+    Charge les données des ventes depuis ventes.csv avec mise en cache.
     """
-    return load_ventes()
-
-def generate_vente_id():
-    """
-    Génère un Vente_ID unique basé sur le maximum des ID existants.
-    """
-    ventes = load_ventes_cache()
-    if ventes.empty:
-        return 1
-    return ventes["Vente_ID"].max() + 1
-
-def save_vente(date, client_nom, client_prenom, produit_nom, quantite, prix_total):
-    """
-    Ajoute une vente au DataFrame et sauvegarde dans data/ventes.csv.
-    Le prix_total est calculé comme Quantité * Prix au kg du produit.
-    """
-    ventes = load_ventes_cache(_invalidate=True)
-
-    # Valider la date
     try:
-        datetime.strptime(date, "%Y-%m-%d")
-    except ValueError:
-        st.error("La date doit être au format AAAA-MM-JJ")
-        return False
+        ventes = pd.read_csv(VENTES_FILE)
+        return ventes
+    except FileNotFoundError:
+        return pd.DataFrame(columns=["Vente_ID", "Date", "Client_ID", "Produit_ID", "Quantité", "Prix"])
+    except Exception as e:
+        st.error(f"Erreur lors du chargement des ventes : {e}")
+        return pd.DataFrame(columns=["Vente_ID", "Date", "Client_ID", "Produit_ID", "Quantité", "Prix"])
 
-    # Valider le client
-    client_id = find_client_id(client_nom, client_prenom)
-    if client_id is None:
-        st.error("Client non trouvé")
-        return False
-
-    # Valider le produit
-    produit_id = find_produit_id(produit_nom)
-    if produit_id is None:
-        st.error("Produit non trouvé")
-        return False
-
-    # Valider la quantité
+def save_vente(date, client_nom, client_prenom, produits, quantites, prix_totaux):
+    """
+    Enregistre une vente avec plusieurs produits dans ventes.csv.
+    Args:
+        date (str): Date de la vente (format YYYY-MM-DD).
+        client_nom (str): Nom du client.
+        client_prenom (str): Prénom du client.
+        produits (list): Liste des noms de produits.
+        quantites (list): Liste des quantités correspondantes.
+        prix_totaux (list): Liste des prix totaux par produit.
+    Returns:
+        bool: True si succès, False sinon.
+    """
     try:
-        quantite = float(quantite)
-        if quantite <= 0:
-            st.error("La quantité doit être positive")
+        ventes = load_ventes_cache(_invalidate=True)
+        clients = load_clients_cache(_invalidate=True)
+        produits_df = load_produits_cache(_invalidate=True)
+
+        # Trouver l'ID du client
+        client = clients[(clients["Nom"].str.lower() == client_nom.lower()) & 
+                         (clients["Prénom"].str.lower() == client_prenom.lower())]
+        if client.empty:
             return False
-    except ValueError:
-        st.error("La quantité doit être un nombre valide")
-        return False
+        client_id = client.iloc[0]["Client_ID"]
 
-    # Valider le prix total
-    try:
-        prix_total = float(prix_total)
-        if prix_total < 0:
-            st.error("Le prix total ne peut pas être négatif")
-            return False
-    except ValueError:
-        st.error("Le prix total doit être un nombre valide")
-        return False
+        # Générer un nouveau Vente_ID
+        new_vente_id = ventes["Vente_ID"].max() + 1 if not ventes.empty else 1
 
-    # Générer un nouvel ID
-    new_id = generate_vente_id()
+        # Créer une ligne pour chaque produit
+        new_rows = []
+        for produit_nom, quantite, prix in zip(produits, quantites, prix_totaux):
+            produit = produits_df[produits_df["Nom"] == produit_nom]
+            if produit.empty:
+                return False
+            produit_id = produit.iloc[0]["Produit_ID"]
+            
+            new_row = {
+                "Vente_ID": new_vente_id,
+                "Date": date,
+                "Client_ID": client_id,
+                "Produit_ID": produit_id,
+                "Quantité": quantite,
+                "Prix": prix
+            }
+            new_rows.append(new_row)
 
-    # Créer une nouvelle ligne
-    new_vente = pd.DataFrame({
-        "Vente_ID": [new_id],
-        "Date": [date],
-        "Client_ID": [client_id],
-        "Produit_ID": [produit_id],
-        "Quantité": [quantite],
-        "Prix": [prix_total]
-    })
-
-    # Ajouter la ligne avec pd.concat
-    ventes = pd.concat([ventes, new_vente], ignore_index=True)
-
-    # Sauvegarder dans data/ventes.csv
-    try:
-        ventes.to_csv("data/ventes.csv", index=False)
-        st.cache_data.clear()
+        # Ajouter les nouvelles lignes
+        new_ventes = pd.DataFrame(new_rows)
+        ventes = pd.concat([ventes, new_ventes], ignore_index=True)
+        
+        # Sauvegarder
+        ventes.to_csv(VENTES_FILE, index=False)
+        
+        # Invalider le cache
+        load_ventes_cache.clear()
         return True
     except Exception as e:
-        st.error(f"Erreur lors de la sauvegarde de la vente : {e}")
+        st.error(f"Erreur lors de l'enregistrement de la vente : {e}")
         return False
-
-def find_vente_id(vente_id):
-    """
-    Vérifie si une vente avec le Vente_ID donné existe.
-    Retourne True si la vente existe, False sinon.
-    """
-    ventes = load_ventes_cache()
-    matching_ventes = ventes[ventes["Vente_ID"] == vente_id]
-    if matching_ventes.empty:
-        st.error(f"Aucune vente trouvée avec l'ID {vente_id}")
-        return False
-    return True
 
 def delete_vente(vente_id):
     """
-    Supprime une vente du DataFrame basé sur son Vente_ID.
+    Supprime toutes les lignes associées à un Vente_ID dans ventes.csv.
     """
-    if not find_vente_id(vente_id):
-        return False
-
-    ventes = load_ventes_cache(_invalidate=True)
-
-    # Supprimer la ligne avec le Vente_ID
-    ventes = ventes[ventes["Vente_ID"] != vente_id]
-
-    # Sauvegarder le DataFrame mis à jour
     try:
-        ventes.to_csv("data/ventes.csv", index=False)
-        st.cache_data.clear()
-        st.success(f"Vente (ID: {vente_id}) supprimée avec succès !")
+        ventes = load_ventes_cache(_invalidate=True)
+        if ventes[ventes["Vente_ID"] == vente_id].empty:
+            return False
+        
+        ventes = ventes[ventes["Vente_ID"] != vente_id]
+        ventes.to_csv(VENTES_FILE, index=False)
+        
+        load_ventes_cache.clear()
         return True
     except Exception as e:
         st.error(f"Erreur lors de la suppression de la vente : {e}")
@@ -150,59 +100,65 @@ def delete_vente(vente_id):
 
 def get_ventes_affichage():
     """
-    Retourne un DataFrame des ventes avec les noms des clients et produits à la place des ID.
+    Retourne un DataFrame pour l'affichage des ventes regroupées par commande.
+    Colonnes : Vente_ID, Date, Client, Prix total.
     """
-    ventes = load_ventes_cache(_invalidate=True)
-    clients = load_clients_cache(_invalidate=True)
-    produits = load_produits_cache(_invalidate=True)
-
-    if ventes.empty:
-        return pd.DataFrame(columns=["Vente_ID", "Date", "Client", "Produit", "Quantité", "Prix"])
-
     try:
-        # Vérifier les colonnes nécessaires dans ventes
-        if not all(col in ventes.columns for col in ["Vente_ID", "Date", "Client_ID", "Produit_ID", "Quantité", "Prix"]):
-            st.error("Colonnes manquantes dans ventes.csv")
-            return pd.DataFrame(columns=["Vente_ID", "Date", "Client", "Produit", "Quantité", "Prix"])
+        ventes = load_ventes_cache(_invalidate=True)
+        clients = load_clients_cache(_invalidate=True)
+        if ventes.empty or clients.empty:
+            return pd.DataFrame(columns=["Vente_ID", "Date", "Client", "Prix total"])
 
-        # Initialiser les colonnes Client et Produit
-        ventes["Client"] = "Inconnu"
-        ventes["Produit"] = "Inconnu"
+        # Regrouper par Vente_ID, Date, Client_ID pour calculer le prix total
+        ventes_grouped = ventes.groupby(["Vente_ID", "Date", "Client_ID"], as_index=False)["Prix"].sum()
+        ventes_grouped = ventes_grouped.rename(columns={"Prix": "Prix total"})
 
-        # Fusionner avec clients pour obtenir Nom et Prénom
-        if not clients.empty and all(col in clients.columns for col in ["Client_ID", "Nom", "Prénom"]):
-            clients["Client"] = clients["Nom"].fillna("") + " " + clients["Prénom"].fillna("")
-            clients["Client"] = clients["Client"].str.strip()
-            ventes = ventes.merge(
-                clients[["Client_ID", "Client"]],
-                on="Client_ID",
-                how="left",
-                suffixes=("", "_client")
-            )
-            # Remplacer les valeurs manquantes par "Inconnu"
-            ventes["Client"] = ventes["Client_client"].fillna("Inconnu")
-            ventes = ventes.drop(columns=["Client_client"], errors="ignore")
-        else:
-            st.warning("Aucun client disponible ou colonnes manquantes dans clients.csv")
+        # Fusionner avec clients pour obtenir le nom complet
+        clients["Client"] = clients["Nom"].str.cat(clients["Prénom"], sep=" ", na_rep="").str.strip()
+        ventes_grouped = ventes_grouped.merge(
+            clients[["Client_ID", "Client"]],
+            on="Client_ID",
+            how="left"
+        )
+        ventes_grouped["Client"] = ventes_grouped["Client"].fillna("Inconnu")
 
-        # Fusionner avec produits pour obtenir Nom
-        if not produits.empty and all(col in produits.columns for col in ["Produit_ID", "Nom"]):
-            ventes = ventes.merge(
-                produits[["Produit_ID", "Nom"]],
-                on="Produit_ID",
-                how="left"
-            )
-            ventes["Produit"] = ventes["Nom"].fillna("Inconnu")
-            ventes = ventes.drop(columns=["Nom"], errors="ignore")
-        else:
-            st.warning("Aucun produit disponible ou colonnes manquantes dans produits.csv")
+        # Formater la date
+        ventes_grouped["Date"] = pd.to_datetime(ventes_grouped["Date"], errors="coerce").dt.strftime("%Y-%m-%d")
 
-        # Sélectionner les colonnes finales
-        colonnes_affichage = ["Vente_ID", "Date", "Client", "Produit", "Quantité", "Prix"]
-        ventes = ventes[colonnes_affichage]
-
-        return ventes
-
+        # Retourner les colonnes dans l'ordre souhaité
+        return ventes_grouped[["Vente_ID", "Date", "Client", "Prix total"]]
     except Exception as e:
-        st.error(f"Erreur lors de la préparation de l'affichage des ventes : {e}")
-        return pd.DataFrame(columns=["Vente_ID", "Date", "Client", "Produit", "Quantité", "Prix"])
+        st.error(f"Erreur lors de la récupération des ventes : {e}")
+        return pd.DataFrame(columns=["Vente_ID", "Date", "Client", "Prix total"])
+
+def get_vente_details(vente_id):
+    """
+    Retourne les détails des produits pour un Vente_ID donné.
+    Colonnes : Produit, Quantité, Prix unitaire, Prix total.
+    """
+    try:
+        ventes = load_ventes_cache(_invalidate=True)
+        produits = load_produits_cache(_invalidate=True)
+        
+        # Filtrer les lignes pour ce Vente_ID
+        vente = ventes[ventes["Vente_ID"] == vente_id]
+        if vente.empty:
+            return pd.DataFrame(columns=["Produit", "Quantité", "Prix unitaire", "Prix total"])
+
+        # Fusionner avec produits pour obtenir les noms et prix unitaires
+        vente = vente.merge(
+            produits[["Produit_ID", "Nom", "Prix (au Kg)"]],
+            on="Produit_ID",
+            how="left"
+        )
+        vente["Produit"] = vente["Nom"].fillna("Inconnu")
+        vente["Prix unitaire"] = vente["Prix (au Kg)"].fillna(0.0)
+        
+        # Sélectionner et renommer les colonnes
+        details = vente[["Produit", "Quantité", "Prix unitaire", "Prix"]]
+        details = details.rename(columns={"Prix": "Prix total"})
+        
+        return details
+    except Exception as e:
+        st.error(f"Erreur lors de la récupération des détails de la vente : {e}")
+        return pd.DataFrame(columns=["Produit", "Quantité", "Prix unitaire", "Prix total"])

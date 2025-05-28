@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 from client_fonction import save_client, delete_client, load_clients_cache
 from produit_fonction import save_produit, delete_produit, modificate_price, load_produits_cache
-from ventes_fonction import save_vente, delete_vente, load_ventes_cache, get_ventes_affichage
-from depenses_fonction import save_depense, delete_depense, load_depenses_cache
+from ventes_fonction import save_vente, delete_vente, load_ventes_cache, get_ventes_affichage, get_vente_details
+from depenses_fonction import save_depense, delete_depense, load_depenses_cache, get_depense_details, get_depenses_affichage
 from statistiques_fonction import get_dernier_benefice, plot_benefice_evolution, datetime, relativedelta, plot_chiffre_affaires_vs_depenses
 from statistiques_fonction import plot_chiffre_affaires_per_client, plot_depenses_per_name, plot_chiffre_affaires_per_product
 
@@ -107,40 +107,113 @@ elif selected_parties == "Ventes":
     show_ventes = st.checkbox("Afficher la liste des ventes")
     if show_ventes:
         try:
-            ventes_df = get_ventes_affichage()
-            if not ventes_df.empty:
-                st.dataframe(ventes_df)
+            ventes = get_ventes_affichage()
+            if not ventes.empty:
+                st.write("Sélectionnez une vente pour voir les détails :")
+                selected_ventes = []
+                cols = st.columns([1, 2, 3, 2, 1])  # Vente_ID, Date, Client, Prix total, Sélection
+                cols[0].write("Vente_ID")
+                cols[1].write("Date")
+                cols[2].write("Client")
+                cols[3].write("Prix total (€)")
+                cols[4].write("Détails")
+                
+                for index, row in ventes.iterrows():
+                    with st.container():
+                        cols = st.columns([1, 2, 3, 2, 1])
+                        cols[0].write(row["Vente_ID"])
+                        cols[1].write(row["Date"])
+                        cols[2].write(row["Client"])
+                        cols[3].write(f"{row['Prix total']:.2f}")
+                        if cols[4].checkbox("Voir", key=f"detail_{row['Vente_ID']}"):
+                            selected_ventes.append(row["Vente_ID"])
+                
+                # Afficher les détails pour les ventes sélectionnées
+                for vente_id in selected_ventes:
+                    st.subheader(f"Détails de la vente {vente_id}")
+                    details = get_vente_details(vente_id)
+                    if not details.empty:
+                        st.dataframe(details)
+                    else:
+                        st.write("Aucun détail disponible pour cette vente.")
             else:
                 st.write("Aucune donnée vente à afficher.")
         except Exception as e:
             st.error(f"Erreur lors de l'affichage des ventes : {e}")
 
-    # Formulaire pour ajouter une vente
+# Formulaire pour ajouter une vente
     st.header("Ajouter une vente")
+
+    # Initialiser l'état du formulaire
+    if "show_quantites" not in st.session_state:
+        st.session_state.show_quantites = False
+    if "selected_produits" not in st.session_state:
+        st.session_state.selected_produits = []
+
     with st.form(key="vente_form"):
         date = st.date_input("Date de la vente")
-        clients = load_clients_cache()
+        clients = load_clients_cache(_invalidate=True)
         client_options = [f"{row['Nom']} {row['Prénom']}" for _, row in clients.iterrows()]
         client_selection = st.selectbox("Client", client_options)
-        produits = load_produits_cache()
-        produit_options = {row["Nom"]: row["Nom"] for _, row in produits.iterrows()}
-        produit_nom = st.selectbox("Produit", list(produit_options.keys()))
-        quantite = st.number_input("Quantité (kg)", min_value=0.0, step=0.1)
         
-        # Calculer le prix total
-        prix_unitaire = produits[produits["Nom"] == produit_nom]["Prix (au Kg)"].iloc[0] if produit_nom in produit_options else 0.0
-        prix_total = quantite * prix_unitaire
-        st.write(f"Prix total (€) : {prix_total:.2f}")
+        # Sélection multiple de produits
+        produits = load_produits_cache(_invalidate=True)
+        produit_options = list(produits["Nom"])
+        temp_selected_produits = st.multiselect("Produits", produit_options, default=st.session_state.selected_produits)
+        
+        # Bouton pour confirmer la sélection des produits
+        confirm_button = st.form_submit_button("Confirmer la sélection des produits")
+        reset_button = st.form_submit_button("Réinitialiser le formulaire")
+
+        if confirm_button and temp_selected_produits:
+            st.session_state.show_quantites = True
+            st.session_state.selected_produits = temp_selected_produits
+        elif confirm_button:
+            st.error("Veuillez sélectionner au moins un produit.")
+
+        # Afficher les champs de quantité si la sélection est confirmée
+        quantites = []
+        prix_totaux = []
+        total_commande = 0.0
+        if st.session_state.show_quantites:
+            st.subheader("Saisir les quantités")
+            for produit in st.session_state.selected_produits:
+                st.write(f"**{produit}**")
+                quantite = st.number_input(f"Quantité (kg) pour {produit}", min_value=0.0, step=0.1, key=f"quantite_{produit}")
+                prix_unitaire = produits[produits["Nom"] == produit]["Prix (au Kg)"].iloc[0]
+                prix = quantite * prix_unitaire
+                st.write(f"Prix : {prix:.2f} € (Prix unitaire : {prix_unitaire:.2f} €/kg)")
+                quantites.append(quantite)
+                prix_totaux.append(prix)
+                total_commande += prix
+            
+            st.write(f"**Prix total de la commande : {total_commande:.2f} €**")
+        
         submit_button = st.form_submit_button("Enregistrer la vente")
 
-        if submit_button:
-            # Extraire nom et prénom du client
-            client_nom, client_prenom = client_selection.split(" ", 1) if " " in client_selection else (client_selection, "")
-            date_str = date.strftime("%Y-%m-%d")
-            if save_vente(date_str, client_nom, client_prenom, produit_nom, quantite, prix_total):
-                st.success("Vente ajoutée avec succès !")
+        if submit_button and st.session_state.show_quantites:
+            if not st.session_state.selected_produits:
+                st.error("Veuillez sélectionner au moins un produit.")
             else:
-                st.error("Erreur lors de l'ajout de la vente")
+                # Extraire nom et prénom du client
+                client_nom, client_prenom = client_selection.split(" ", 1) if " " in client_selection else (client_selection, "")
+                date_str = date.strftime("%Y-%m-%d")
+                try:
+                    if save_vente(date_str, client_nom, client_prenom, st.session_state.selected_produits, quantites, prix_totaux):
+                        st.success("Vente ajoutée avec succès !")
+                        # Réinitialiser après enregistrement
+                        st.session_state.show_quantites = False
+                        st.session_state.selected_produits = []
+                    else:
+                        st.error("Erreur lors de l'ajout de la vente")
+                except Exception as e:
+                    st.error(f"Erreur lors de l'enregistrement de la vente : {e}")
+
+        if reset_button:
+            # Réinitialiser le formulaire
+            st.session_state.show_quantites = False
+            st.session_state.selected_produits = []
+            st.rerun()
 
     # Formulaire pour supprimer une vente
     st.header("Supprimer une vente")
@@ -149,10 +222,133 @@ elif selected_parties == "Ventes":
         delete_button = st.form_submit_button("Supprimer la vente")
 
         if delete_button:
-            if delete_vente(vente_id):
-                st.success("Vente supprimée avec succès !")
+            try:
+                if delete_vente(vente_id):
+                    st.success("Vente supprimée avec succès !")
+                else:
+                    st.error("Erreur lors de la suppression de la vente")
+            except Exception as e:
+                st.error(f"Erreur lors de la suppression de la vente : {e}")
+
+elif selected_parties == "Dépenses":
+    st.header("Liste des dépenses")
+    show_depenses = st.checkbox("Afficher")
+    if show_depenses:
+        try:
+            depenses = get_depenses_affichage()
+            if not depenses.empty:
+                st.write("Sélectionnez une date pour voir les détails :")
+                selected_dates = []
+                cols = st.columns([3, 2, 1])  # Date, Total, Sélection
+                cols[0].write("Date")
+                cols[1].write("Total (€)")
+                cols[2].write("Détails")
+                
+                for index, row in depenses.iterrows():
+                    with st.container():
+                        cols = st.columns([3, 2, 1])
+                        cols[0].write(row["Date"])
+                        cols[1].write(f"{row['Total']:.2f}")
+                        if cols[2].checkbox("Voir", key=f"detail_depense_{row['Date']}"):
+                            selected_dates.append(row["Date"])
+                
+                # Afficher les détails pour les dates sélectionnées
+                for date in selected_dates:
+                    st.subheader(f"Détails des dépenses du {date}")
+                    details = get_depense_details(date)
+                    if not details.empty:
+                        st.dataframe(details)
+                    else:
+                        st.write("Aucun détail disponible pour cette date.")
             else:
-                st.error("Erreur lors de la suppression de la vente")
+                st.write("Aucune donnée dépense à afficher.")
+        except Exception as e:
+            st.error(f"Erreur lors de l'affichage des dépenses : {e}")
+
+# Formulaire pour ajouter une dépense
+    st.header("Ajouter une dépense")
+
+    # Initialiser l'état du formulaire
+    if "show_prix_depenses" not in st.session_state:
+        st.session_state.show_prix_depenses = False
+    if "selected_depenses" not in st.session_state:
+        st.session_state.selected_depenses = []
+
+    with st.form(key="depense_form"):
+        date = st.date_input("Date de la dépense")
+        noms_depenses = st.text_input("Noms des dépenses (séparés par des virgules)", placeholder="Engrais, Arrosage, Semences")
+
+        # Boutons pour confirmer ou réinitialiser
+        confirm_button = st.form_submit_button("Confirmer la sélection des dépenses")
+        reset_button = st.form_submit_button("Réinitialiser le formulaire")
+
+        if confirm_button and noms_depenses:
+            # Nettoyer et splitter les noms de dépenses
+            temp_selected_depenses = [nom.strip() for nom in noms_depenses.split(",") if nom.strip()]
+            if temp_selected_depenses:
+                st.session_state.show_prix_depenses = True
+                st.session_state.selected_depenses = temp_selected_depenses
+            else:
+                st.error("Veuillez entrer au moins un nom de dépense valide.")
+        elif confirm_button:
+            st.error("Veuillez entrer au moins un nom de dépense.")
+
+        # Afficher les champs de prix si la sélection est confirmée
+        prix_depenses = []
+        total_depenses = 0.0
+        if st.session_state.show_prix_depenses:
+            st.subheader("Saisir les prix des dépenses")
+            for nom in st.session_state.selected_depenses:
+                st.write(f"**{nom}**")
+                prix = st.number_input(f"Prix (€) pour {nom}", min_value=0.0, step=0.1, key=f"prix_{nom}")
+                prix_depenses.append(prix)
+                total_depenses += prix
+                st.write(f"Prix : {prix:.2f} €")
+            
+            st.write(f"**Total des dépenses : {total_depenses:.2f} €**")
+
+        submit_button = st.form_submit_button("Enregistrer les dépenses")
+
+        if submit_button and st.session_state.show_prix_depenses:
+            if not st.session_state.selected_depenses:
+                st.error("Aucune dépense sélectionnée.")
+            else:
+                date_str = date.strftime("%Y-%m-%d")
+                try:
+                    success = True
+                    for nom, prix in zip(st.session_state.selected_depenses, prix_depenses):
+                        if not save_depense(date_str, nom, prix):
+                            success = False
+                            st.error(f"Erreur lors de l'enregistrement de la dépense '{nom}'.")
+                    if success:
+                        st.success("Dépenses ajoutées avec succès !")
+                        # Réinitialiser après enregistrement
+                        st.session_state.show_prix_depenses = False
+                        st.session_state.selected_depenses = []
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur lors de l'enregistrement des dépenses : {e}")
+
+        if reset_button:
+            # Réinitialiser le formulaire
+            st.session_state.show_prix_depenses = False
+            st.session_state.selected_depenses = []
+            st.rerun()
+
+    # Supprimer une dépense
+    st.header("Supprimer une dépense")
+    with st.form(key="delete_depense_form"):
+        depense_id = st.number_input("ID de la dépense", min_value=1, step=1)
+        delete_button = st.form_submit_button("Supprimer")
+
+        if delete_button:
+            try:
+                if delete_depense(depense_id):
+                    st.success("Dépense supprimée !")
+                else:
+                    st.error("Erreur lors de la suppression.")
+            except Exception as e:
+                st.error(f"Erreur lors de la suppression de la dépense : {e}")
 
 elif selected_parties == "Dépenses":
     st.header("Liste des dépenses")
