@@ -260,15 +260,15 @@ elif selected_partie == "Dépenses":
                 cols = st.columns([1, 2, 3, 2, 1])
                 cols[0].write("Depense_ID")
                 cols[1].write("Date")
-                cols[2].write("Nom")
-                cols[3].write("Prix (€)")
+                cols[2].write("Noms")
+                cols[3].write("Total (€)")
                 cols[4].write("Détails")
                 for index, row in depenses.iterrows():
                     cols = st.columns([1, 2, 3, 2, 1])
                     cols[0].write(row["Depense_ID"])
                     cols[1].write(row["Date"])
-                    cols[2].write(row["Nom"])
-                    cols[3].write(f"{row['Prix']:.2f}")
+                    cols[2].write(row["Noms"])
+                    cols[3].write(f"{row['Total']:.2f}")
                     if cols[4].checkbox("Voir", key=f"detail_depense_{row['Depense_ID']}"):
                         selected_depenses.append(row["Depense_ID"])
                 for depense_id in selected_depenses:
@@ -289,7 +289,81 @@ elif selected_partie == "Dépenses":
                 st.write("Aucune donnée dépense à afficher.")
         except Exception as e:
             st.error(f"Erreur lors de l'affichage des dépenses : {e}")
-            
+
+    st.header("Ajouter une dépense")
+    if "show_prix_depenses" not in st.session_state:
+        st.session_state.show_prix_depenses = False
+    if "selected_depenses" not in st.session_state:
+        st.session_state.selected_depenses = []
+    if "depense_form_reset" not in st.session_state:
+        st.session_state.depense_form_reset = False
+
+    with st.form(key="depense_form"):
+        date = st.date_input("Date de la dépense")
+        noms_depenses = st.text_input("Noms des dépenses (séparés par des virgules)", placeholder="Engrais, Arrosage, Semences", key="depense_noms")
+        confirm_button = st.form_submit_button("Confirmer la sélection des dépenses")
+        reset_button = st.form_submit_button("Réinitialiser le formulaire")
+        if confirm_button and noms_depenses:
+            temp_selected_depenses = [nom.strip() for nom in noms_depenses.split(",") if nom.strip()]
+            if temp_selected_depenses:
+                st.session_state.show_prix_depenses = True
+                st.session_state.selected_depenses = temp_selected_depenses
+                st.session_state.depense_form_reset = False
+            else:
+                st.error("Veuillez entrer au moins un nom de dépense valide.")
+        elif confirm_button:
+            st.error("Veuillez entrer au moins un nom de dépense.")
+        prix_depenses = []
+        total_depenses = 0.0
+        if st.session_state.show_prix_depenses and not st.session_state.depense_form_reset:
+            st.subheader("Saisir les prix des dépenses")
+            for nom in st.session_state.selected_depenses:
+                prix = st.number_input(f"Prix (€) pour {nom}", min_value=0.0, step=0.1, key=f"prix_{nom}")
+                prix_depenses.append(prix)
+                total_depenses += prix
+                st.write(f"Prix : {prix:.2f} €")
+            st.write(f"**Total des dépenses : {total_depenses:.2f} €**")
+        submit_button = st.form_submit_button("Enregistrer les dépenses")
+        if submit_button and st.session_state.show_prix_depenses:
+            if not st.session_state.selected_depenses or not all(p > 0 for p in prix_depenses):
+                st.error("Veuillez entrer des prix valides pour toutes les dépenses.")
+            else:
+                date_str = date.strftime("%Y-%m-%d")
+                try:
+                    if save_depense(date_str, st.session_state.selected_depenses, prix_depenses):
+                        st.success("Dépenses ajoutées avec succès !")
+                        st.session_state.show_prix_depenses = False
+                        st.session_state.selected_depenses = []
+                        st.session_state.depense_form_reset = True
+                        st.rerun()
+                    else:
+                        st.error("Erreur lors de l'enregistrement des dépenses.")
+                except Exception as e:
+                    st.error(f"Erreur lors de l'enregistrement des dépenses : {e}")
+        if reset_button:
+            st.session_state.show_prix_depenses = False
+            st.session_state.selected_depenses = []
+            st.session_state.depense_form_reset = True
+            if "depense_noms" in st.session_state:
+                st.session_state.depense_noms = ""
+            for nom in st.session_state.get("selected_depenses", []):
+                if f"prix_{nom}" in st.session_state:
+                    st.session_state[f"prix_{nom}"] = 0.0
+            st.rerun()
+
+    st.header("Supprimer une dépense")
+    with st.form(key="delete_depense_form"):
+        depense_id = st.number_input("ID de la dépense", min_value=1, step=1)
+        delete_button = st.form_submit_button("Supprimer la dépense")
+        if delete_button:
+            try:
+                if delete_depense(depense_id):
+                    st.success("Dépense supprimée avec succès !")
+                else:
+                    st.error("Dépense non trouvée ou erreur lors de la suppression.")
+            except Exception as e:
+                st.error(f"Erreur lors de la suppression de la dépense : {e}")
+
     st.header("Ajouter une dépense")
     if "show_prix_depenses" not in st.session_state:
         st.session_state.show_prix_depenses = False
