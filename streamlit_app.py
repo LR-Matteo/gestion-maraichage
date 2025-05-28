@@ -414,6 +414,10 @@ elif selected_partie == "Statistiques":
                 f"<h3 style='color:{couleur}'>Bénéfice au {derniere_date.strftime('%Y-%m-%d')} : {dernier_benefice:.2f} €</h3>",
                 unsafe_allow_html=True
             )
+            # Affichage du chiffre d'affaires total
+            ventes = load_ventes_cache(_invalidate=True)
+            ca_total = ventes["Prix"].sum() if not ventes.empty and "Prix" in ventes.columns else 0.0
+            st.markdown(f"**Chiffre d'affaires total : {ca_total:.2f} €**")
         else:
             st.write("Aucune donnée disponible pour calculer le bénéfice.")
     except Exception as e:
