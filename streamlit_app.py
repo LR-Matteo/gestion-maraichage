@@ -53,10 +53,14 @@ if selected_partie == "Clients":
         submit_button = st.form_submit_button("Enregistrer le client")
         if submit_button:
             if nom and prenom:
-                if save_client(nom, prenom, email, telephone):
-                    st.success("Client ajouté avec succès !")
+                clients = load_clients_cache(_invalidate=True)
+                if not clients.empty and ((clients["Nom"] == nom) & (clients["Prénom"] == prenom)).any():
+                    st.error("Un client avec ce nom et prénom existe déjà.")
                 else:
-                    st.error("Erreur lors de l'ajout du client")
+                    if save_client(nom, prenom, email, telephone):
+                        st.success("Client ajouté avec succès !")
+                    else:
+                        st.error("Erreur lors de l'ajout du client")
             else:
                 st.error("Veuillez remplir le nom et le prénom.")
 
@@ -98,10 +102,14 @@ elif selected_partie == "Produits":
         submit_button = st.form_submit_button("Enregistrer le produit")
         if submit_button:
             if nom_produit and prix_produit > 0:
-                if save_produit(nom_produit, prix_produit):
-                    st.success("Produit ajouté avec succès !")
+                produits = load_produits_cache(_invalidate=True)
+                if not produits.empty and (produits["Nom"] == nom_produit).any():
+                    st.error("Un produit avec ce nom existe déjà.")
                 else:
-                    st.error("Erreur lors de l’ajout du produit")
+                    if save_produit(nom_produit, prix_produit):
+                        st.success("Produit ajouté avec succès !")
+                    else:
+                        st.error("Erreur lors de l’ajout du produit")
             else:
                 st.error("Veuillez remplir le nom et un prix valide.")
 
